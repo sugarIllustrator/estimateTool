@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>イラスト見積もりシステム</title>
+<style>
+  body { font-family: "Hiragino Maru Gothic Pro", sans-serif; background: #fff0f5; color: #333; padding: 20px; }
+  h1 { text-align: center; color: #d46a92; }
+  form, .result { max-width: 600px; margin: auto; background: #fff; padding: 15px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+  input, select, textarea { width: 100%; max-width: 300px; margin-bottom: 10px; padding: 8px; border-radius: 6px; border: 1px solid #ccc; display: block; }
+  label { display: flex; align-items: center; margin-bottom: 8px; }
+  label input[type="checkbox"] { margin-right: 8px; width: auto; }
+  button { background: #d46a92; color: white; padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; }
+  button:hover { background: #c2557f; }
+  textarea.copy-area { width: 100%; height: 250px; font-family: monospace; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+
+<h1>イラスト見積もりシステム</h1>
+
+<form id="estimateForm">
+  <input type="text" name="name" placeholder="お名前" required>
+  <select name="usage" required>
+    <option value="">使用用途を選択</option>
+    <option value="IRIAM">IRIAM配信用立ち絵</option>
+    <option value="Live2D">Live2D用パーツ分け立ち絵</option>
+    <option value="Vtuber">Vtuberキービジュアル</option>
+    <option value="SNS">SNS用アイコン</option>
+    <option value="Ichimai">1枚絵(歌ってみた含む)</option>
+    <option value="Other">その他</option>
+  </select>
+  <select name="range">
+    <option value="">描写範囲を選択</option>
+    <option value="chest">胸上</option>
+    <option value="waist">腰上</option>
+    <option value="full">全身</option>
+  </select>
+  <div>
+    <strong>オプション</strong><br>
+    <label><input type="checkbox" name="option" value="express">早期納品(特急仕上げ)</label>
+    <label><input type="checkbox" name="option" value="expressions_check" onchange="toggleExpressionsInput(this)">表情差分</label>
+    <input type="number" name="expressions" placeholder="表情差分の数" min="0" style="max-width:120px; display:none;">
+    <label><input type="checkbox" name="option" value="character_design">キャラクターデザイン</label>
+    <label><input type="checkbox" name="option" value="background">背景追加</label>
+    <label><input type="checkbox" name="option" value="commercial">商用利用</label>
+  </div>
+  <textarea name="details" placeholder="依頼内容" rows="2"></textarea>
+  <textarea name="size_format" placeholder="サイズ、解像度、納品形式" rows="2"></textarea>
+  <input type="date" name="deadline" placeholder="希望納期">
+  <select name="portfolio">
+    <option value="">公開実績としてポートフォリオ掲載</option>
+    <option value="yes">有</option>
+    <option value="no">無</option>
+  </select>
+  <input type="url" name="reference" placeholder="資料URL">
+  <textarea name="other" placeholder="その他ご要望" rows="2"></textarea>
+  <button type="button" onclick="calculateEstimate()">見積もり計算</button>
+</form>
+
+<div class="result" id="result"></div>
+<div class="result" id="confirmation" style="display:none;"></div>
+
+<script>
+function toggleExpressionsInput(checkbox) {
+  const expressionsInput = document.querySelector("input[name='expressions']");
+  expressionsInput.style.display = checkbox.checked ? "block" : "none";
+  if (!checkbox.checked) expressionsInput.value = "";
+}
+function calculateEstimate() {
+  const form = document.forms["estimateForm"];
+  const usage = form.usage.value;
+  const range = form.range.value;
+  const options = Array.from(form.querySelectorAll("input[name='option']:checked")).map(opt => opt.value);
+  const expressionsChecked = options.includes("expressions_check");
+  const expressionsCount = expressionsChecked ? (parseInt(form.expressions.value) || 0) : 0;
+  const name = form.name.value;
+  const detailsText = form.details.value;
+  const sizeFormat = form.size_format.value;
+  const deadline = form.deadline.value;
+  const portfolio = form.portfolio.value === "yes" ? "有" : (form.portfolio.value === "no" ? "無" : "");
+  const reference = form.reference.value;
+  const other = form.other.value;
+  let basePrice = 0;
+  let optionTotal = 0;
+  let details = [];
+  if (usage === "IRIAM") {
+    basePrice = 36000;
+    details.push(`IRIAM配信用立ち絵: ¥${basePrice.toLocaleString()}`);
+  } else if (usage === "Live2D") {
+    basePrice = 88000;
+    details.push(`Live2D用パーツ分け立ち絵: ¥${basePrice.toLocaleString()}`);
+  } else {
+    if (range === "chest") { basePrice = 12000; details.push(`描写範囲 胸上: ¥12,000`); }
+    if (range === "waist") { basePrice = 17000; details.push(`描写範囲 腰上: ¥17,000`); }
+    if (range === "full") { basePrice = 22000; details.push(`描写範囲 全身: ¥22,000`); }
+  }
+  if (options.includes("express")) { optionTotal += 3000; details.push(`早期納品: ¥3,000`); }
+  if (expressionsCount > 0) { optionTotal += 2000 * expressionsCount; details.push(`表情差分 ×${expressionsCount}: ¥${(2000 * expressionsCount).toLocaleString()}`); }
+  if (options.includes("character_design")) { optionTotal += 10000; details.push(`キャラクターデザイン: ¥10,000`); }
+  if (options.includes("background")) { optionTotal += 10000; details.push(`背景追加: ¥10,000`); }
+  let subtotal = basePrice + optionTotal;
+  if (options.includes("commercial")) {
+    let commercialBase = basePrice + optionTotal;
+    if (usage === "IRIAM" || usage === "Live2D") { commercialBase = optionTotal; }
+    let commercialFee = Math.floor(commercialBase * 0.5);
+    subtotal += commercialFee;
+    details.push(`商用利用料 (対象金額の50%): ¥${commercialFee.toLocaleString()}`);
+  }
+  const dataForConfirm = {
+    name,
+    usage,
+    detailsText,
+    sizeFormat,
+    deadline,
+    portfolio,
+    reference,
+    other,
+    detailList: details.join("\n"),
+    subtotal: subtotal.toLocaleString()
+  };
+  let resultHtml = `<h2>お見積もり結果</h2><ul>`;
+  details.forEach(line => { resultHtml += `<li>${line}</li>`; });
+  resultHtml += `</ul><p><strong>合計: ¥${subtotal.toLocaleString()}</strong></p>`;
+  resultHtml += `<button onclick='showConfirmation(${JSON.stringify(dataForConfirm)})'>依頼、問い合わせをする</button>`;
+  document.getElementById("result").innerHTML = resultHtml;
+  document.getElementById("confirmation").style.display = "none";
+}
+function showConfirmation(data) {
+  const { name, usage, detailsText, sizeFormat, deadline, portfolio, reference, other, detailList, subtotal } = data;
+  const message = `${name} 様\n\nお見積りシステムのご利用ありがとうございます。\n以下、お見積り条件です。\n\n使用用途：${usage}\n依頼内容：${detailsText}\nサイズ・解像度・納品形式：${sizeFormat}\n希望納期：${deadline}\nご予算希望：\n公開実績としてポートフォリオ掲載：${portfolio}\n資料添付：${reference}\nその他ご要望：${other}\n\n上記条件での概算見積は以下の通りとなります。\n\n✼••┈┈••✼••┈┈••✼••\n\n${detailList}\n\n合計: ¥${subtotal}\n\n✼••┈┈••✼••┈┈••✼••\nお振込先:\n楽天銀行 ハープ支店\n普通 4476020\nオガタ ミナミ\n\n※原則お見積り後、1～2週間でのお支払いをお願いしております。`;
+  document.getElementById("confirmation").innerHTML = `<h1>ご依頼の方へ</h1><p>ご依頼の際はお見積り後原則1～2週間でのお支払いをお願いしております。何卒ご協力のほどよろしくお願いいたします。</p><textarea class='copy-area' readonly>${message}</textarea><button onclick='sendXDM(${JSON.stringify(message)})'>XにDMを送信する</button><button onclick='sendMail(${JSON.stringify(message)})'>メールを送信する</button><button onclick='location.reload()'>フォームに戻る</button>`;
+  document.getElementById("confirmation").style.display = "block";
+  document.getElementById("result").style.display = "none";
+}
+function sendXDM(text) {
+  window.open(`https://twitter.com/messages/compose?recipient_id=1938631378666770433&text=${encodeURIComponent(text)}`, '_blank');
+}
+function sendMail(text) {
+  window.open(`mailto:m.sugar0628@gmail.com?subject=${encodeURIComponent("お見積り依頼の件")}&body=${encodeURIComponent(text)}`, '_blank');
+}
+</script>
+
+</body>
+</html>
